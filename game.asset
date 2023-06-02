@@ -1,0 +1,4 @@
+ASSET_NAME TYPE PATH
+player_shader shader somewher/in/the/filesystem
+pew_sound sound somewhere/else/in/the/filesystem
+player_picture picture somewhere/else/else/in
