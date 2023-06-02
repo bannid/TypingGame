@@ -14,13 +14,14 @@
 #include "gl_shader.h"
 #include "glad.c"
 #include "random.cpp"
-#include "gl_texture.cpp"
 
+#define MAX_SHADERS 50
 global const char* WindowName = "Typing Game";
 global game_struct *GlobalGame;
 global BOOL GlobalRunning = TRUE;
 global u32 GlobalQuadVao;
-global gl_shader GlobalQuadShader;
+global gl_shader GlobalShaders[MAX_SHADERS];
+global u32 GlobalNumberOfShaders = 0;
 global irrklang::ISoundEngine *GlobalSoundEngine = NULL;
 
 #define PLAY_SOUND(FunctionName) void FunctionName(const char *Name)
@@ -328,14 +329,22 @@ Win32SaveGameState()
 inline void
 GLDrawQuad(v2f Position, v2f Scale, f32 Angle)
 {
-	glUniform2fv(GlobalQuadShader.Uniforms[1].Location,
+	gl_shader *Shader = NULL;
+	for(int i = 0; i < GlobalNumberOfShaders; i++)
+	{
+		if(strcmp(GlobalShaders[i].Name, "quad_shader") == 0)
+		{
+			Shader = GlobalShaders + i;
+		}
+	}
+	glUniform2fv(Shader->Uniforms[1].Location,
 				 1,
 				 (f32*)&Position);
-	glUniform2fv(GlobalQuadShader.Uniforms[2].Location,
+	glUniform2fv(Shader->Uniforms[2].Location,
 				 1,
 				 (f32*)&Scale);
-	glUniform1f(GlobalQuadShader.Uniforms[3].Location, Angle);
-	glUseProgram(GlobalQuadShader.ProgramID);
+	glUniform1f(Shader->Uniforms[3].Location, Angle);
+	glUseProgram(Shader->ProgramID);
 	glBindVertexArray(GlobalQuadVao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
@@ -389,11 +398,6 @@ CALLBACK WinMain(HINSTANCE instance,
     }
 	RandomInitialize();
 	GlobalSoundEngine = irrklang::createIrrKlangDevice();
-	if (GlobalSoundEngine == NULL)
-	{
-		// TODO(Banni): Do something about it.
-		// We shouldn't stop user from playing game if they dont have sound.
-	}
     glfwMakeContextCurrent(Window);
     glfwSetFramebufferSizeCallback(Window, GLFWFramebufferResizeCallback);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -401,13 +405,6 @@ CALLBACK WinMain(HINSTANCE instance,
         glfwTerminate();
         return -1;
     }
-	bool ShadersResult = Win32GLCreateShaderFromFile("..\\shaders\\quad_shader_vs.c",
-													 "..\\shaders\\quad_shader_fs.c",
-													 &GlobalQuadShader);
-	if (!ShadersResult)
-	{
-		return -1;
-	}
 	win32_file AssetFile;
 	if(!Win32ReadEntireFile("..\\game.asset", &AssetFile))
 	{
@@ -428,6 +425,39 @@ CALLBACK WinMain(HINSTANCE instance,
 																							 It->Name);
 				Win32CloseFile(&SoundFile);
 			}
+		}
+		if(It->Type == AssetType_Shader)
+		{
+			win32_file VsSource;
+			win32_file FsSource;
+			const char *ExtensionVs = "_vs.c";
+			const char *ExtensionFs = "_fs.c";
+			char FilePathVs[512];
+			char FilePathFs[512];
+			strcpy(FilePathVs, It->Path);
+			strcat(FilePathVs, ExtensionVs);
+			strcpy(FilePathFs, It->Path);
+			strcat(FilePathFs, ExtensionFs);
+			bool VsFileOkay = Win32ReadEntireFile(FilePathVs, &VsSource);
+			bool FsFileOkay = Win32ReadEntireFile(FilePathFs, &FsSource);
+			if(VsFileOkay && FsFileOkay)
+			{
+				strcpy(GlobalShaders[GlobalNumberOfShaders].Name, It->Name);
+				OpenGLCreateShader((const char**)&VsSource.Data,
+								   (const char**)&FsSource.Data,
+								   &GlobalShaders[GlobalNumberOfShaders].ProgramID);
+				GlobalNumberOfShaders++;
+			}
+			if(VsFileOkay)
+			{
+				Win32CloseFile(&VsSource);
+			}
+			
+			if(FsFileOkay)
+			{
+				Win32CloseFile(&FsSource);
+			}
+			
 		}
 	}
 	GlobalQuadVao = OpenGLCreateQuadTextureBuffer();
@@ -457,20 +487,20 @@ CALLBACK WinMain(HINSTANCE instance,
 	{
 		GlobalGame->PlaySound = PlaySoundStub;
 	}
+	gl_shader *QuadShader = &GlobalShaders[0];
+	glUseProgram(QuadShader->ProgramID);
+	strcpy(QuadShader->Uniforms[0].Name, "ScreenDimensions");
+	strcpy(QuadShader->Uniforms[1].Name, "Position");
+	strcpy(QuadShader->Uniforms[2].Name, "Scale");
+	strcpy(QuadShader->Uniforms[2].Name, "Angle");
+	QuadShader->Uniforms[0].Location = glGetUniformLocation(QuadShader->ProgramID,
+															"ScreenDimensions");
 	
-	glUseProgram(GlobalQuadShader.ProgramID);
-	strcpy(GlobalQuadShader.Uniforms[0].Name, "ScreenDimensions");
-	strcpy(GlobalQuadShader.Uniforms[1].Name, "Position");
-	strcpy(GlobalQuadShader.Uniforms[2].Name, "Scale");
-	strcpy(GlobalQuadShader.Uniforms[2].Name, "Angle");
-	GlobalQuadShader.Uniforms[0].Location = glGetUniformLocation(GlobalQuadShader.ProgramID,
-																 "ScreenDimensions");
-	
-	GlobalQuadShader.Uniforms[1].Location = glGetUniformLocation(GlobalQuadShader.ProgramID, "Position");
-	GlobalQuadShader.Uniforms[2].Location = glGetUniformLocation(GlobalQuadShader.ProgramID, "Scale");
-	GlobalQuadShader.Uniforms[3].Location = glGetUniformLocation(GlobalQuadShader.ProgramID, "Angle");
+	QuadShader->Uniforms[1].Location = glGetUniformLocation(QuadShader->ProgramID, "Position");
+	QuadShader->Uniforms[2].Location = glGetUniformLocation(QuadShader->ProgramID, "Scale");
+	QuadShader->Uniforms[3].Location = glGetUniformLocation(QuadShader->ProgramID, "Angle");
 	v2f ScreenDimensions = { (f32)GlobalGame->Screen.Width, (f32)GlobalGame->Screen.Height };
-	glUniform2fv(GlobalQuadShader.Uniforms[0].Location, 1, (f32*)&ScreenDimensions);
+	glUniform2fv(QuadShader->Uniforms[0].Location, 1, (f32*)&ScreenDimensions);
 	f32 MusicTimer = 0;
 	f32 OldTime = glfwGetTime();
     while(!glfwWindowShouldClose(Window) && GlobalRunning)

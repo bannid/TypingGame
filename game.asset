@@ -1,2 +1,3 @@
-pew sound ..\assets\shoot.wav
-pew2 sound ..\assets\shoot2.wav
+pew sound ..\assets\sounds\shoot.wav
+pew2 sound ..\assets\sounds\shoot2.wav
+quad_shader shader ..\assets\shaders\quad_shader
