@@ -9,6 +9,8 @@
 #include "typinggame.h"
 #include "typinggame_types.h"
 #include "win32_fileapi.h"
+#include "asset.h"
+#include "asset.cpp"
 #include "gl_shader.h"
 #include "glad.c"
 #include "random.cpp"
@@ -21,17 +23,10 @@ global u32 GlobalQuadVao;
 global gl_shader GlobalQuadShader;
 global irrklang::ISoundEngine *GlobalSoundEngine = NULL;
 
-#define PLAY_SOUND(Name) void Name(const char *Name)
-PLAY_SOUND(PlaySoundStub)
-{
-	
-}
-GAME_INIT_FUNCTION(GameInitStub)
-{
-}
-GAME_UPDATE_FUNCTION(GameUpdateStub)
-{
-}
+#define PLAY_SOUND(FunctionName) void FunctionName(const char *Name)
+PLAY_SOUND(PlaySoundStub){}
+GAME_INIT_FUNCTION(GameInitStub){}
+GAME_UPDATE_FUNCTION(GameUpdateStub){}
 
 struct game_code 
 {
@@ -368,11 +363,11 @@ Win32GLCreateShaderFromFile(const char *VsFilePath, const char *FsFilePath, gl_s
 	return(Result);
 }
 
-void
-PlaySound(const char* Name)
+PLAY_SOUND(PlaySound)
 {
 	GlobalSoundEngine->play2D((const char*)Name);
 }
+
 
 int 
 CALLBACK WinMain(HINSTANCE instance,
@@ -412,6 +407,28 @@ CALLBACK WinMain(HINSTANCE instance,
 	if (!ShadersResult)
 	{
 		return -1;
+	}
+	win32_file AssetFile;
+	if(!Win32ReadEntireFile("..\\game.asset", &AssetFile))
+	{
+		return -1;
+	}
+	asset Assets[50];
+	LoadAssets(AssetFile.Data, Assets);
+	Win32CloseFile(&AssetFile);
+	for(asset *It = Assets; It != Assets + 50; It++)
+	{
+		if (GlobalSoundEngine != NULL && It->Type == AssetType_Sound)
+		{
+			win32_file SoundFile;
+			if(Win32ReadEntireFile(It->Path, &SoundFile))
+			{
+				irrklang::ISoundSource *Source = GlobalSoundEngine->addSoundSourceFromMemory((void*)SoundFile.Data,
+																							 SoundFile.Size,
+																							 It->Name);
+				Win32CloseFile(&SoundFile);
+			}
+		}
 	}
 	GlobalQuadVao = OpenGLCreateQuadTextureBuffer();
 	GlobalGame = new game_struct;
@@ -456,15 +473,6 @@ CALLBACK WinMain(HINSTANCE instance,
 	glUniform2fv(GlobalQuadShader.Uniforms[0].Location, 1, (f32*)&ScreenDimensions);
 	f32 MusicTimer = 0;
 	f32 OldTime = glfwGetTime();
-	if(GlobalSoundEngine != NULL)
-	{
-		win32_file SoundFile;
-		if(Win32ReadEntireFile("..\\assets\\shoot.wav", &SoundFile))
-		{
-			GlobalSoundEngine->addSoundSourceFromMemory((void*)SoundFile.Data, SoundFile.Size, "shoot.wav");
-			Win32CloseFile(&SoundFile);
-		}
-	}
     while(!glfwWindowShouldClose(Window) && GlobalRunning)
 	{
 		f32 CurrentTime = glfwGetTime();
@@ -481,6 +489,13 @@ CALLBACK WinMain(HINSTANCE instance,
 			Win32ReloadCode(&GameCode);
 		}
     }
+	if(GlobalSoundEngine != NULL)
+	{
+		GlobalSoundEngine->drop();
+	}
 	Win32SaveGameState();
+	glfwTerminate();
+	// TODO(Banni): Check if we dint close any file just for debugging purposes.
+	// Its good to not lock the files while we are playing the game.
     return 0;
 }

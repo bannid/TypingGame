@@ -5,6 +5,7 @@
 
 enum enum_asset_type
 {
+	AssetType_None = 0x00,
 	AssetType_Shader,
 	AssetType_Sound,
 	AssetType_Image

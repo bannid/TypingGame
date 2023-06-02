@@ -10,13 +10,13 @@ UpdateGame(game_struct *Game, f32 dt, f32 t)
 	{
 		if(Game->GameInput.CharacterKey.Key == GameInputKey_A)
 		{
-			Game->PlaySound("shoot.wav");
+			Game->PlaySound("pew");
 			Game->Player.Angle+=.1f;
 		}
 		else if (Game->GameInput.CharacterKey.Key == GameInputKey_D)
 		{
 			Game->Player.Angle-=.1f;
-			Game->PlaySound("shoot.wav");
+			Game->PlaySound("pew2");
 		}
 	}
 	Game->DrawQuad(Game->Player.Pos, Game->Player.Scale, Game->Player.Angle);

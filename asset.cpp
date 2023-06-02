@@ -1,8 +1,8 @@
 #include <string.h>
 
 #define ASSET_EOF 0
-void
-LoadAssets(u8 *AssetFileText)
+bool
+LoadAssets(u8 *AssetFileText, asset *Assets)
 {
 	u8 *BasePointer = AssetFileText;
 	u8 *Cursor = BasePointer;
@@ -11,12 +11,13 @@ LoadAssets(u8 *AssetFileText)
 		Cursor++;
 		if (*Cursor == ASSET_EOF)
 		{
-			return;
+			return true;
 		}
 	}
+	// TODO(Banni): Fix this!!! If we have more assets than this,
+	// then we will have undefined behaviour
 	// Right now lets say we only have 100 assets
 	asset_file_token Tokens[100 * 3];
-	asset Assets[100];
 	u32 NumberOfTokens = 0;
 	u32 NumberOfAssets = 0;
 	while(1)
@@ -49,6 +50,11 @@ LoadAssets(u8 *AssetFileText)
 			break;
 		}
 	}
+	if (NumberOfTokens % 3 != 0)
+	{
+		DEBUG_LOG("Invalid asset file");
+		return false;
+	}
 	for(int i = 0; i < NumberOfTokens; i+=3)
 	{
 		strcpy(Assets[NumberOfAssets].Name, Tokens[i].Token);
@@ -69,4 +75,5 @@ LoadAssets(u8 *AssetFileText)
 		}
 		NumberOfAssets++;
 	}
+	return true;
 }
