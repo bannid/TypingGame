@@ -17,6 +17,6 @@ rem cl /DDEBUG /DDEBUG_TIME_STEP /FeCardGame.exe /MD -FC -Zi %FilesDebug% /I  %I
 
 cl /LD  ../typinggame.cpp /Fegame.dll -Zi /link -PDB:game_%random%.pdb
 
-cl /DDEBUG /DEBUG /FeAssetTester.exe /MD -FC -Zi ../AssetTester.cpp 
+rem cl /DDEBUG /DEBUG /FeAssetTester.exe /MD -FC -Zi ../AssetTester.cpp 
 
 popd 

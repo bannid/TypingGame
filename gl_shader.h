@@ -4,7 +4,7 @@
 #define GL_SHADER_H
 
 #define T_GL_SHADERS_MAX_UNIFORMS 20
-#define T_GL_SHADERS_UNIFORM_NAME_MAX_LENGTH 16
+#define T_GL_SHADERS_UNIFORM_NAME_MAX_LENGTH 20
 
 struct gl_uniform
 {
@@ -15,7 +15,7 @@ struct gl_uniform
 
 struct gl_shader 
 {
-	char Name[20];
+	char Name[T_GL_SHADERS_UNIFORM_NAME_MAX_LENGTH];
 	GLint ProgramID;
 	i32 NumberOfUniforms;
 	gl_uniform Uniforms[T_GL_SHADERS_UNIFORM_NAME_MAX_LENGTH];

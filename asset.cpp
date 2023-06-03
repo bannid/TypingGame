@@ -2,7 +2,7 @@
 
 #define ASSET_EOF 0
 bool
-LoadAssets(u8 *AssetFileText, asset *Assets)
+ParseAssetsFile(u8 *AssetFileText, asset *Assets)
 {
 	u8 *BasePointer = AssetFileText;
 	u8 *Cursor = BasePointer;
@@ -62,9 +62,9 @@ LoadAssets(u8 *AssetFileText, asset *Assets)
 		if(strcmp(Tokens[i + 1].Token, "shader") == 0){
 			Assets[NumberOfAssets].Type = AssetType_Shader;
 		}
-		else if(strcmp(Tokens[i + 1].Token, "image") == 0)
+		else if(strcmp(Tokens[i + 1].Token, "texture") == 0)
 		{
-			Assets[NumberOfAssets].Type = AssetType_Image;
+			Assets[NumberOfAssets].Type = AssetType_Texture;
 		}
 		else if(strcmp(Tokens[i + 1].Token, "sound") == 0)
 		{

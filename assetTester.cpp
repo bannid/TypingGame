@@ -8,6 +8,6 @@ int main()
 {
 	const char *AssetFileText = "something shader /somewhere/in/the/file\nsomething shader /somewhere/in/the/file";
 	asset Assets[50];
-	LoadAssets((u8*)AssetFileText, Assets);
+	ParseAssetsFile((u8*)AssetFileText, Assets);
 	return 1;
 }

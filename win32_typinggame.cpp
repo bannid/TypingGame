@@ -115,10 +115,10 @@ OpenGLCreateShader(const char ** VertexShaderSource, const char ** FragmentShade
     return true;
 }
 
-#if 0
-void
-PopulateUniformInfo(gl_shader *Shader)
+inline void
+OpenGLPopulateUniformInfo(gl_shader *Shader)
 {
+	Shader->NumberOfUniforms = 0;
 	// Get all the info about uniforms
     GLint I;
     GLint Count;
@@ -143,7 +143,45 @@ PopulateUniformInfo(gl_shader *Shader)
         Shader->NumberOfUniforms++;
     }
 }
-#endif
+
+inline void
+OpenGLShaderSetV2f(gl_shader *Shader, const char *Name, v2f *Value)
+{
+	for(int i = 0; i < Shader->NumberOfUniforms; i++)
+	{
+		if(strcmp(Shader->Uniforms[i].Name, Name) == 0)
+		{
+			if(Shader->Uniforms[i].Type == GL_FLOAT_VEC2)
+			{
+				glUniform2fv(Shader->Uniforms[i].Location, 1, (f32*)Value);
+			}
+			else
+			{
+				DEBUG_LOG("ERROR OpenGLShaderSetV2f: Uniform doesnt match the type");
+			}
+		}
+	}
+}
+
+
+inline void
+OpenGLShaderSetFloat(gl_shader *Shader, const char *Name, f32 Value)
+{
+	for(int i = 0; i < Shader->NumberOfUniforms; i++)
+	{
+		if(strcmp(Shader->Uniforms[i].Name, Name) == 0)
+		{
+			if(Shader->Uniforms[i].Type == GL_FLOAT)
+			{
+				glUniform1f(Shader->Uniforms[i].Location, Value);
+			}
+			else
+			{
+				DEBUG_LOG("ERROR OpenGLShaderSetV2f: Uniform doesnt match the type");
+			}
+		}
+	}
+}
 
 
 inline bool
@@ -337,13 +375,14 @@ GLDrawQuad(v2f Position, v2f Scale, f32 Angle)
 			Shader = GlobalShaders + i;
 		}
 	}
-	glUniform2fv(Shader->Uniforms[1].Location,
-				 1,
-				 (f32*)&Position);
-	glUniform2fv(Shader->Uniforms[2].Location,
-				 1,
-				 (f32*)&Scale);
-	glUniform1f(Shader->Uniforms[3].Location, Angle);
+	if(Shader == NULL)
+	{
+		DEBUG_LOG("ERROR GLDrawQuad: quad_shader not found");
+		return;
+	}
+	OpenGLShaderSetV2f(Shader, "Position", &Position);
+	OpenGLShaderSetV2f(Shader, "Scale", &Scale);
+	OpenGLShaderSetFloat(Shader, "Angle", Angle);
 	glUseProgram(Shader->ProgramID);
 	glBindVertexArray(GlobalQuadVao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -377,43 +416,19 @@ PLAY_SOUND(PlaySound)
 	GlobalSoundEngine->play2D((const char*)Name);
 }
 
-
-int 
-CALLBACK WinMain(HINSTANCE instance,
-                 HINSTANCE prevInstance,
-                 LPSTR commandLine,
-                 int showCode)
+void
+LoadAssets()
 {
-	i32 WindowWidth = 800;
-	i32 WindowHeight = 800;
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
-    GLFWwindow * Window = glfwCreateWindow(WindowWidth, WindowHeight, WindowName, NULL, NULL);
-    if ( Window == NULL )
-    {
-        return -1;
-    }
-	RandomInitialize();
-	GlobalSoundEngine = irrklang::createIrrKlangDevice();
-    glfwMakeContextCurrent(Window);
-    glfwSetFramebufferSizeCallback(Window, GLFWFramebufferResizeCallback);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        glfwTerminate();
-        return -1;
-    }
+	GlobalNumberOfShaders = 0;
 	win32_file AssetFile;
 	if(!Win32ReadEntireFile("..\\game.asset", &AssetFile))
 	{
-		return -1;
+		exit(-1);
 	}
-	asset Assets[50];
-	LoadAssets(AssetFile.Data, Assets);
+	asset Assets[50] = {};
+	ParseAssetsFile(AssetFile.Data, Assets);
 	Win32CloseFile(&AssetFile);
-	for(asset *It = Assets; It != Assets + 50; It++)
+	for(asset *It = Assets; It != Assets + 3; It++)
 	{
 		if (GlobalSoundEngine != NULL && It->Type == AssetType_Sound)
 		{
@@ -452,7 +467,6 @@ CALLBACK WinMain(HINSTANCE instance,
 			{
 				Win32CloseFile(&VsSource);
 			}
-			
 			if(FsFileOkay)
 			{
 				Win32CloseFile(&FsSource);
@@ -460,6 +474,40 @@ CALLBACK WinMain(HINSTANCE instance,
 			
 		}
 	}
+	for(int i = 0; i < GlobalNumberOfShaders; i++)
+	{
+		OpenGLPopulateUniformInfo(&GlobalShaders[i]);
+	}
+}
+
+int 
+CALLBACK WinMain(HINSTANCE instance,
+                 HINSTANCE prevInstance,
+                 LPSTR commandLine,
+                 int showCode)
+{
+	i32 WindowWidth = 800;
+	i32 WindowHeight = 800;
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
+    GLFWwindow * Window = glfwCreateWindow(WindowWidth, WindowHeight, WindowName, NULL, NULL);
+    if ( Window == NULL )
+    {
+        return -1;
+    }
+	RandomInitialize();
+	GlobalSoundEngine = irrklang::createIrrKlangDevice();
+    glfwMakeContextCurrent(Window);
+    glfwSetFramebufferSizeCallback(Window, GLFWFramebufferResizeCallback);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        glfwTerminate();
+        return -1;
+    }
+	LoadAssets();
 	GlobalQuadVao = OpenGLCreateQuadTextureBuffer();
 	GlobalGame = new game_struct;
 	game_code GameCode = {};
@@ -489,34 +537,30 @@ CALLBACK WinMain(HINSTANCE instance,
 	}
 	gl_shader *QuadShader = &GlobalShaders[0];
 	glUseProgram(QuadShader->ProgramID);
-	strcpy(QuadShader->Uniforms[0].Name, "ScreenDimensions");
-	strcpy(QuadShader->Uniforms[1].Name, "Position");
-	strcpy(QuadShader->Uniforms[2].Name, "Scale");
-	strcpy(QuadShader->Uniforms[2].Name, "Angle");
-	QuadShader->Uniforms[0].Location = glGetUniformLocation(QuadShader->ProgramID,
-															"ScreenDimensions");
-	
-	QuadShader->Uniforms[1].Location = glGetUniformLocation(QuadShader->ProgramID, "Position");
-	QuadShader->Uniforms[2].Location = glGetUniformLocation(QuadShader->ProgramID, "Scale");
-	QuadShader->Uniforms[3].Location = glGetUniformLocation(QuadShader->ProgramID, "Angle");
 	v2f ScreenDimensions = { (f32)GlobalGame->Screen.Width, (f32)GlobalGame->Screen.Height };
-	glUniform2fv(QuadShader->Uniforms[0].Location, 1, (f32*)&ScreenDimensions);
-	f32 MusicTimer = 0;
+	OpenGLShaderSetV2f(GlobalShaders, "ScreenDimensions", &ScreenDimensions);
+	f32 KeyTimer = 0;
 	f32 OldTime = glfwGetTime();
+	f32 Time = 0;
     while(!glfwWindowShouldClose(Window) && GlobalRunning)
 	{
 		f32 CurrentTime = glfwGetTime();
 		f32 ElapsedTime = CurrentTime - OldTime;
+		Time += ElapsedTime;
 		OldTime = CurrentTime;
-		MusicTimer += ElapsedTime;
 		GLFWKeyInput(Window);
-        //TIMED_BLOCK("GameLoop");
-        GameCode.GameUpdateCallback(GlobalGame, 0, 0);
+        GameCode.GameUpdateCallback(GlobalGame, ElapsedTime, Time);
         glfwSwapBuffers(Window);
-        glfwPollEvents();
+		if(glfwGetKey(Window, GLFW_KEY_R) == GLFW_PRESS && KeyTimer < 0)
 		{
-			TIMED_BLOCK("GameReload");
-			Win32ReloadCode(&GameCode);
+			KeyTimer = 3;
+			GameCode.GameInitCallback(GlobalGame);
+		}
+        glfwPollEvents();
+		Win32ReloadCode(&GameCode);
+		if(KeyTimer > 0)
+		{
+			KeyTimer -= ElapsedTime;
 		}
     }
 	if(GlobalSoundEngine != NULL)

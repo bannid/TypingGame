@@ -1,10 +1,11 @@
 #include <windows.h>
 #include "typinggame.h"
+#include "random.cpp"
 
 DLL_API void
-UpdateGame(game_struct *Game, f32 dt, f32 t)
+UpdateGame(game_struct *Game, f32 DeltaTime, f32 Time)
 {
-    Game->ClearScreen(.0f, .5f, .0f, 1.0f);
+    Game->ClearScreen(.9f, .5f, .2f, 1.0f);
 	if (Game->GameInput.CharacterKey.IsPressed == TRUE)
 	{
 		if(Game->GameInput.CharacterKey.Key == GameInputKey_A)
