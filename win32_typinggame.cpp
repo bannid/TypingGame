@@ -64,7 +64,6 @@ OpenGLCreateQuadTextureBuffer()
     return Vao;
 }
 
-
 bool
 OpenGLCreateShader(const char ** VertexShaderSource, const char ** FragmentShaderSource, i32 *ProgramOut)
 {
@@ -163,7 +162,6 @@ OpenGLShaderSetV2f(gl_shader *Shader, const char *Name, v2f *Value)
 	}
 }
 
-
 inline void
 OpenGLShaderSetFloat(gl_shader *Shader, const char *Name, f32 Value)
 {
@@ -183,6 +181,41 @@ OpenGLShaderSetFloat(gl_shader *Shader, const char *Name, f32 Value)
 	}
 }
 
+inline void
+OpenGLSetGlobalsInShaders()
+{
+	for(int i = 0; i < GlobalNumberOfShaders; i++)
+	{
+		gl_shader *Shader = GlobalShaders + i;
+		glUseProgram(Shader->ProgramID);
+		v2f ScreenDimensions = { (f32)GlobalGame->Screen.Width, (f32)GlobalGame->Screen.Height };
+		OpenGLShaderSetV2f(Shader, "ScreenDimensions", &ScreenDimensions);
+	}
+}
+
+inline void
+OpenGLDrawQuad(v2f Position, v2f Scale, f32 Angle)
+{
+	gl_shader *Shader = NULL;
+	for(int i = 0; i < GlobalNumberOfShaders; i++)
+	{
+		if(strcmp(GlobalShaders[i].Name, "quad_shader") == 0)
+		{
+			Shader = GlobalShaders + i;
+		}
+	}
+	if(Shader == NULL)
+	{
+		DEBUG_LOG("ERROR GLDrawQuad: quad_shader not found");
+		return;
+	}
+	glUseProgram(Shader->ProgramID);
+	OpenGLShaderSetV2f(Shader, "Position", &Position);
+	OpenGLShaderSetV2f(Shader, "Scale", &Scale);
+	OpenGLShaderSetFloat(Shader, "Angle", Angle);
+	glBindVertexArray(GlobalQuadVao);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+}
 
 inline bool
 Win32ReadEntireFile(const char *FileName, win32_file *FileStruct)
@@ -364,30 +397,6 @@ Win32SaveGameState()
     CloseHandle(FileHandle);
 }
 
-inline void
-GLDrawQuad(v2f Position, v2f Scale, f32 Angle)
-{
-	gl_shader *Shader = NULL;
-	for(int i = 0; i < GlobalNumberOfShaders; i++)
-	{
-		if(strcmp(GlobalShaders[i].Name, "quad_shader") == 0)
-		{
-			Shader = GlobalShaders + i;
-		}
-	}
-	if(Shader == NULL)
-	{
-		DEBUG_LOG("ERROR GLDrawQuad: quad_shader not found");
-		return;
-	}
-	OpenGLShaderSetV2f(Shader, "Position", &Position);
-	OpenGLShaderSetV2f(Shader, "Scale", &Scale);
-	OpenGLShaderSetFloat(Shader, "Angle", Angle);
-	glUseProgram(Shader->ProgramID);
-	glBindVertexArray(GlobalQuadVao);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
 inline bool
 Win32GLCreateShaderFromFile(const char *VsFilePath, const char *FsFilePath, gl_shader *Shader)
 {
@@ -416,7 +425,7 @@ PLAY_SOUND(PlaySound)
 	GlobalSoundEngine->play2D((const char*)Name);
 }
 
-void
+inline void
 LoadAssets()
 {
 	GlobalNumberOfShaders = 0;
@@ -526,7 +535,8 @@ CALLBACK WinMain(HINSTANCE instance,
 	GlobalGame->Screen.Width = WindowWidth;
 	GlobalGame->Screen.Height = WindowHeight;
     GlobalGame->ClearScreen = ClearScreen;
-	GlobalGame->DrawQuad = GLDrawQuad;
+	GlobalGame->DrawQuad = OpenGLDrawQuad;
+	OpenGLSetGlobalsInShaders();
 	if(GlobalSoundEngine != NULL)
 	{
 		GlobalGame->PlaySound = PlaySound;
@@ -535,10 +545,6 @@ CALLBACK WinMain(HINSTANCE instance,
 	{
 		GlobalGame->PlaySound = PlaySoundStub;
 	}
-	gl_shader *QuadShader = &GlobalShaders[0];
-	glUseProgram(QuadShader->ProgramID);
-	v2f ScreenDimensions = { (f32)GlobalGame->Screen.Width, (f32)GlobalGame->Screen.Height };
-	OpenGLShaderSetV2f(GlobalShaders, "ScreenDimensions", &ScreenDimensions);
 	f32 KeyTimer = 0;
 	f32 OldTime = glfwGetTime();
 	f32 Time = 0;
@@ -551,9 +557,11 @@ CALLBACK WinMain(HINSTANCE instance,
 		GLFWKeyInput(Window);
         GameCode.GameUpdateCallback(GlobalGame, ElapsedTime, Time);
         glfwSwapBuffers(Window);
-		if(glfwGetKey(Window, GLFW_KEY_R) == GLFW_PRESS && KeyTimer < 0)
+		if(glfwGetKey(Window, GLFW_KEY_R) == GLFW_PRESS && KeyTimer <= 0)
 		{
 			KeyTimer = 3;
+			LoadAssets();
+			OpenGLSetGlobalsInShaders();
 			GameCode.GameInitCallback(GlobalGame);
 		}
         glfwPollEvents();
