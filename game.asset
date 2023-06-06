@@ -1,3 +1,4 @@
 pew sound ..\assets\sounds\shoot.wav
 pew2 sound ..\assets\sounds\shoot2.wav
 quad_shader shader ..\assets\shaders\quad_shader
+circle_shader shader ..\assets\shaders\circle_shader

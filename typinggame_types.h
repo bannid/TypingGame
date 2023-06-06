@@ -5,8 +5,12 @@
 #include "typing_math.h"
 #include "typedefines.h"
 
+#define MAX_TARGETS 20
+#define MAX_BULLETS 100
+
 typedef void (*clear_screen_fptr)(f32 R, f32 G, f32 B, f32 A);
 typedef void (*draw_quad)(v2f Position, v2f Scale, f32 Angle);
+typedef void (*draw_circle)(v2f Position, v2f Scale);
 typedef void (*play_sound)(const char *Name);
 struct player 
 {
@@ -28,8 +32,7 @@ struct player
 
 struct target
 {
-    f32 X;
-    f32 Y;
+	v2f Pos;
     v2f Velocity;
     char Character;
 	BOOL IsAlive;
@@ -109,11 +112,12 @@ struct game_struct
     world World;
     screen Screen;
     player Player;
-    target Targets[20];
-    bullet Bullets[100];
+    target Targets[MAX_TARGETS];
+    bullet Bullets[MAX_BULLETS];
 	game_keyboard_input GameInput;
 	clear_screen_fptr ClearScreen;
 	draw_quad DrawQuad;
+	draw_circle DrawCircle;
 	play_sound PlaySound;
 };
 

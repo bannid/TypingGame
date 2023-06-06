@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <windows.h>
 #include <glad.h>
+#include "glad.c"
 #include <glfw3.h>
 #include <irklang/irrKlang.h>
 #include "debug.h"
@@ -12,7 +13,6 @@
 #include "asset.h"
 #include "asset.cpp"
 #include "gl_shader.h"
-#include "glad.c"
 #include "random.cpp"
 
 #define MAX_SHADERS 50
@@ -23,7 +23,7 @@ global u32 GlobalQuadVao;
 global gl_shader GlobalShaders[MAX_SHADERS];
 global u32 GlobalNumberOfShaders = 0;
 global irrklang::ISoundEngine *GlobalSoundEngine = NULL;
-
+global int NumberOfOpenFileHanldes = 0;
 #define PLAY_SOUND(FunctionName) void FunctionName(const char *Name)
 PLAY_SOUND(PlaySoundStub){}
 GAME_INIT_FUNCTION(GameInitStub){}
@@ -64,7 +64,7 @@ OpenGLCreateQuadTextureBuffer()
     return Vao;
 }
 
-bool
+inline bool
 OpenGLCreateShader(const char ** VertexShaderSource, const char ** FragmentShaderSource, i32 *ProgramOut)
 {
     char Log[1024];
@@ -129,6 +129,7 @@ OpenGLPopulateUniformInfo(gl_shader *Shader)
     {
 		DEBUG_LOG("ERROR: There are more uniforms than max allowed");
     }
+	glUseProgram(Shader->ProgramID);
     for (I = 0; I < (Count <= T_GL_SHADERS_MAX_UNIFORMS ? Count : T_GL_SHADERS_MAX_UNIFORMS); I++)
     {
         glGetActiveUniform(Shader->ProgramID,
@@ -217,6 +218,36 @@ OpenGLDrawQuad(v2f Position, v2f Scale, f32 Angle)
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
+inline void
+OpenGLDrawCircle(v2f Position, v2f Scale)
+{
+	gl_shader *Shader = NULL;
+	for(int i = 0; i < GlobalNumberOfShaders; i++)
+	{
+		if(strcmp(GlobalShaders[i].Name, "circle_shader") == 0)
+		{
+			Shader = GlobalShaders + i;
+		}
+	}
+	if(Shader == NULL)
+	{
+		DEBUG_LOG("ERROR GLDrawQuad: quad_shader not found");
+		return;
+	}
+	glUseProgram(Shader->ProgramID);
+	OpenGLShaderSetV2f(Shader, "Position", &Position);
+	OpenGLShaderSetV2f(Shader, "Scale", &Scale);
+	glBindVertexArray(GlobalQuadVao);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+inline void
+OpenGLClearScreen(f32 R, f32 G, f32 B, f32 A)
+{
+    glClearColor(R, G, B, A);
+    glClear(GL_COLOR_BUFFER_BIT);
+}
+
 inline bool
 Win32ReadEntireFile(const char *FileName, win32_file *FileStruct)
 {
@@ -266,6 +297,7 @@ Win32ReadEntireFile(const char *FileName, win32_file *FileStruct)
 	}
 	ASSERT(TotalNumberOfBytesRead == FileStruct->Size);
 	FileStruct->Data = Buffer;
+	NumberOfOpenFileHanldes++;
 	return true;
 }
 
@@ -274,6 +306,7 @@ Win32CloseFile(win32_file *File)
 {
 	CloseHandle(File->Handle);
 	VirtualFree(File->Data, File->Size, MEM_RELEASE);
+	NumberOfOpenFileHanldes--;
 }
 
 inline FILETIME
@@ -337,13 +370,6 @@ Win32FileExists(const char *FileName)
 		return true;
 	}
 	return false;
-}
-
-inline void
-ClearScreen(f32 R, f32 G, f32 B, f32 A)
-{
-    glClearColor(R, G, B, A);
-    glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void GLFWFramebufferResizeCallback(GLFWwindow *Window, i32 Width, i32 Height)
@@ -420,7 +446,7 @@ Win32GLCreateShaderFromFile(const char *VsFilePath, const char *FsFilePath, gl_s
 	return(Result);
 }
 
-PLAY_SOUND(PlaySound)
+inline PLAY_SOUND(PlaySound)
 {
 	GlobalSoundEngine->play2D((const char*)Name);
 }
@@ -437,7 +463,7 @@ LoadAssets()
 	asset Assets[50] = {};
 	ParseAssetsFile(AssetFile.Data, Assets);
 	Win32CloseFile(&AssetFile);
-	for(asset *It = Assets; It != Assets + 3; It++)
+	for(asset *It = Assets; It != Assets + 50; It++)
 	{
 		if (GlobalSoundEngine != NULL && It->Type == AssetType_Sound)
 		{
@@ -507,15 +533,15 @@ CALLBACK WinMain(HINSTANCE instance,
     {
         return -1;
     }
-	RandomInitialize();
-	GlobalSoundEngine = irrklang::createIrrKlangDevice();
     glfwMakeContextCurrent(Window);
     glfwSetFramebufferSizeCallback(Window, GLFWFramebufferResizeCallback);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         glfwTerminate();
         return -1;
     }
+	RandomInitialize();
+	GlobalSoundEngine = irrklang::createIrrKlangDevice();
 	LoadAssets();
 	GlobalQuadVao = OpenGLCreateQuadTextureBuffer();
 	GlobalGame = new game_struct;
@@ -529,13 +555,14 @@ CALLBACK WinMain(HINSTANCE instance,
 		{
 			game_struct SavedState = *((game_struct*)GameStateFile.Data);
 			*GlobalGame = SavedState;
-			CloseHandle(GameStateFile.Handle);
+			Win32CloseFile(&GameStateFile);
 		}
 	}
 	GlobalGame->Screen.Width = WindowWidth;
 	GlobalGame->Screen.Height = WindowHeight;
-    GlobalGame->ClearScreen = ClearScreen;
+    GlobalGame->ClearScreen = OpenGLClearScreen;
 	GlobalGame->DrawQuad = OpenGLDrawQuad;
+	GlobalGame->DrawCircle = OpenGLDrawCircle;
 	OpenGLSetGlobalsInShaders();
 	if(GlobalSoundEngine != NULL)
 	{
@@ -557,13 +584,16 @@ CALLBACK WinMain(HINSTANCE instance,
 		GLFWKeyInput(Window);
         GameCode.GameUpdateCallback(GlobalGame, ElapsedTime, Time);
         glfwSwapBuffers(Window);
+		
+#ifdef TYPING_INTERNAL
 		if(glfwGetKey(Window, GLFW_KEY_R) == GLFW_PRESS && KeyTimer <= 0)
 		{
-			KeyTimer = 3;
+			KeyTimer = .1;
 			LoadAssets();
 			OpenGLSetGlobalsInShaders();
 			GameCode.GameInitCallback(GlobalGame);
 		}
+#endif
         glfwPollEvents();
 		Win32ReloadCode(&GameCode);
 		if(KeyTimer > 0)
@@ -579,5 +609,6 @@ CALLBACK WinMain(HINSTANCE instance,
 	glfwTerminate();
 	// TODO(Banni): Check if we dint close any file just for debugging purposes.
 	// Its good to not lock the files while we are playing the game.
+	ASSERT(NumberOfOpenFileHanldes == 0);
     return 0;
 }

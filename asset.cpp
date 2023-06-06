@@ -1,5 +1,5 @@
 #include <string.h>
-
+#include "asset.h"
 #define ASSET_EOF 0
 bool
 ParseAssetsFile(u8 *AssetFileText, asset *Assets)
@@ -52,7 +52,6 @@ ParseAssetsFile(u8 *AssetFileText, asset *Assets)
 	}
 	if (NumberOfTokens % 3 != 0)
 	{
-		DEBUG_LOG("Invalid asset file");
 		return false;
 	}
 	for(int i = 0; i < NumberOfTokens; i+=3)
